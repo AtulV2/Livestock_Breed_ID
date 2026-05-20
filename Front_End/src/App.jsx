@@ -68,34 +68,50 @@ function App() {
         </button>
       </form>
 
-      {predictions.length > 0 && (
-        <div>
-          <h2>Results:</h2>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {predictions.map((pred, index) => (
-              <li
-                key={index}
-                style={{
-                  border: '1px solid #ccc',
-                  padding: '10px',
-                  marginBottom: '10px',
-                  borderRadius: '5px'
-                }}
-              >
-                <strong>File:</strong> {pred.filename} <br />
-                {pred.error ? (
-                  <span style={{ color: 'red' }}>Error: {pred.error}</span>
-                ) : (
-                  <>
-                    <strong>Detected Breed:</strong> {pred.breed} <br />
-                    <strong>Confidence:</strong> {pred.confidence}
-                  </>
+                {predictions.length > 0 && (
+                  <div>
+                    <h2>Results:</h2>
+                    <ul style={{ listStyle: 'none', padding: 0 }}>
+                      {predictions.map((pred, index) => (
+                        <li
+                          key={index}
+                          style={{
+                            border: '1px solid #ccc',
+                            padding: '15px',
+                            marginBottom: '10px',
+                            borderRadius: '8px',
+                            backgroundColor: pred.confidence ? '#fff' : '#fff9f0' // Light orange tint if no cow
+                          }}
+                        >
+                          <strong>File:</strong> {pred.filename} <br />
+                          
+                          {pred.error ? (
+                            <span style={{ color: 'red' }}>Error: {pred.error}</span>
+                          ) : (
+                            <>
+                              <strong>Result:</strong> 
+                              <span style={{ 
+                                color: pred.confidence ? 'green' : '#d97706', 
+                                fontWeight: 'bold',
+                                marginLeft: '5px' 
+                              }}>
+                                {pred.breed}
+                              </span> 
+                              <br />
+                              
+                              {/* ONLY show confidence if it is NOT null */}
+                              {pred.confidence && (
+                                <>
+                                  <strong>Confidence:</strong> {pred.confidence}
+                                </>
+                              )}
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

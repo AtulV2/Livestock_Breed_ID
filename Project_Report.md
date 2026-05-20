@@ -1,121 +1,163 @@
 # Project Report: Cattle Breed Classification System
 
 ## 1. Abstract
-The accurate identification of cattle breeds is a crucial component of modern livestock management and precision agriculture. This project presents an end-to-end Machine Learning web application designed to classify various Indian cattle breeds from images. By leveraging Transfer Learning with the MobileNetV2 architecture, the system achieves high accuracy while maintaining computational efficiency. The solution features a decoupled architecture, incorporating a centralized ML Core, a high-performance FastAPI backend, and a modern React-based frontend to provide an intuitive user experience for single and multi-image breed prediction.
+The accurate identification of cattle breeds is a crucial component of modern livestock management and precision agriculture. This project presents an end-to-end Machine Learning web application designed to classify various Indian cattle breeds from images. To ensure high robustness, the system employs a two-step pipeline: an initial object detection phase using YOLOv8 to locate and crop cattle from complex backgrounds, followed by a classification phase using Transfer Learning with MobileNetV2. The solution features a decoupled architecture, incorporating a centralized ML Core, a high-performance FastAPI backend, and a modern React-based frontend to provide an intuitive user experience for single and multi-image breed prediction.
 
 ## 2. Introduction
 ### 2.1 Problem Statement
-In the agricultural sector, specifically in livestock farming, identifying cattle breeds accurately is essential for breeding programs, health monitoring, and market valuation. Manual identification relies heavily on human expertise, which can be subjective, time-consuming, and error-prone. There is a need for an automated, reliable, and accessible tool that can accurately classify cattle breeds using computer vision.
+In the agricultural sector, identifying cattle breeds accurately is essential for breeding programs, health monitoring, and market valuation. Manual identification relies heavily on human expertise, which can be subjective, time-consuming, and error-prone. Additionally, field images often contain background noise, multiple animals, or irrelevant objects. There is a need for an automated, reliable, and accessible tool that can accurately isolate and classify cattle breeds using computer vision.
 
 ### 2.2 Objectives
-* To develop a deep learning model capable of accurately classifying various Indian cattle breeds from images.
-* To implement a centralized machine learning core utilizing Transfer Learning (MobileNetV2).
-* To construct a robust and scalable backend API using FastAPI for serving model predictions.
+* To develop a robust two-step deep learning pipeline for cattle detection and classification.
+* To utilize YOLOv8 for accurate object detection and cropping of cattle from images.
+* To implement a centralized machine learning core utilizing Transfer Learning (MobileNetV2) for breed classification.
+* To construct a scalable backend API using FastAPI for serving model predictions.
 * To design a user-friendly frontend interface using React for seamless interaction and image uploading.
-* To ensure the system is maintainable, adhering to DRY (Don't Repeat Yourself) principles and clean architecture.
+* To ensure the system is maintainable, adhering to Object-Oriented principles and clean architecture.
 
-## 3. Dataset Description
-The project utilizes the **Indian Cattle Image Dataset** (sourced from Kaggle). This dataset comprises categorized folders containing images of various distinct Indian cattle breeds (such as Amritmahal, Gir, etc.). The dataset is organized in a hierarchical directory structure where each subdirectory represents a specific breed class, facilitating dynamic reading and automatic class registration by the model.
+## 3. System Requirements
+### 3.1 Hardware Requirements
+* **Processor:** Minimum Intel Core i5 or equivalent (i7/i9 or AMD Ryzen 5+ recommended for faster inference).
+* **RAM:** Minimum 8 GB (16 GB or higher recommended, especially for model training).
+* **Storage:** 5 GB of free disk space for models, datasets, and project files.
+* **GPU (Optional but Recommended):** NVIDIA GPU with CUDA support for accelerated model training and inference.
 
-![Cattle Grazing Example](https://images.unsplash.com/photo-1546452285-d85c5443e9d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80)
-*(Note: Example image illustrating cattle in an agricultural setting.)*
+### 3.2 Software Requirements
+* **Operating System:** Windows 10/11, macOS, or Linux.
+* **Programming Language:** Python 3.8+
+* **Frontend Environment:** Node.js 18+ and npm.
+* **Libraries & Frameworks:** 
+  * Backend: FastAPI, Uvicorn, Python-Multipart.
+  * Machine Learning: TensorFlow, Keras, Ultralytics YOLO, OpenCV, NumPy.
+  * Frontend: React, Vite.
 
-## 4. Methodology
-The methodology involves several key phases: data ingestion, preprocessing, model selection, fine-tuning, and inference.
+## 4. Dataset Description
+The project utilizes the **Indian Cattle Image Dataset** (sourced from Kaggle). This dataset comprises categorized folders containing images of various distinct Indian cattle breeds (such as Amritmahal, Gir, etc.). The dataset is organized in a hierarchical directory structure where each subdirectory represents a specific breed class. 
 
-### 4.1 Data Preprocessing
-Images uploaded to the system or fed during training are processed using OpenCV and NumPy. The images are:
-* Resized to standard dimensions required by the MobileNetV2 input layer (e.g., 224x224 pixels).
-* Normalized to scale pixel values appropriately, enhancing model convergence during training and accuracy during inference.
+## 5. Methodology
+The methodology involves a robust two-step pipeline:
 
-### 4.2 Transfer Learning with MobileNetV2
-To achieve high accuracy with a limited dataset, the project utilizes **Transfer Learning**. 
-* **Base Model:** MobileNetV2, pre-trained on the ImageNet dataset, is used as the base feature extractor. MobileNetV2 is chosen for its optimal balance between performance and computational efficiency (lightweight architecture).
-* **Custom Classification Head:** The top classification layers of the original MobileNetV2 are replaced with a custom Dense neural network layer tailored to output the probabilities for the specific number of cattle breeds present in the dataset.
+### 5.1 Step 1: Object Detection with YOLOv8
+Images uploaded to the system are first processed by a YOLOv8s (You Only Look Once) model.
+* The model is configured with a high sensitivity (e.g., confidence threshold of 0.20) to detect cattle (COCO class ID 19).
+* Upon detection, the bounding box coordinates are extracted. A 10% padding is added to the bounding box to ensure the entire animal is captured.
+* The image is cropped to this bounding box, effectively removing background noise and isolating the subject.
+* If no cattle are detected, the system intelligently aborts the classification phase and returns a "No Cattle Detected" response to the user.
 
-### 4.3 Model Training and Evaluation
-The model is trained using a categorical cross-entropy loss function and optimized via an appropriate optimizer (e.g., Adam). The `Training_model.py` script facilitates the local training process. The trained weights are subsequently saved as `livestock_mobilenetv2.weights.h5` to be loaded dynamically during inference without needing to retrain.
+### 5.2 Step 2: Image Preprocessing and Classification
+The cropped cattle image is then processed for classification:
+* **Preprocessing:** The cropped image is resized to standard dimensions (224x224 pixels) and normalized.
+* **Transfer Learning with MobileNetV2:** MobileNetV2, pre-trained on ImageNet, is used as the base feature extractor. Its lightweight architecture provides an optimal balance of speed and accuracy.
+* **Custom Classification Head:** The top classification layers are replaced with a custom Dense neural network tailored to output probabilities for the specific cattle breeds in the dataset.
 
-## 5. System Architecture
-The system follows a client-server architecture, distinctly separating the frontend presentation, backend logic, and the machine learning inference engine.
-
-### 5.1 Architecture Diagram
+## 6. System Design
+### 6.1 Architecture Diagram
+The system follows a client-server architecture, distinctly separating presentation, API routing, and the machine learning inference engine.
 
 ```mermaid
 graph TD
-    %% Entities
     User((User))
     
-    %% Frontend
     subgraph Frontend [React Frontend Application]
         UI[User Interface]
         ImageUpload[Image Upload Module]
         ResultsDisplay[Results Display]
     end
     
-    %% Backend
     subgraph Backend [FastAPI Backend Server]
         API[RESTful API endpoints]
         ImageHandler[In-Memory Image Handler]
     end
     
-    %% ML Core
     subgraph MLCore [Machine Learning Core]
-        ModelLoader[Model Loader]
+        YOLO[YOLOv8s Detector]
         Preprocessor[Image Preprocessor]
         MobileNetV2[MobileNetV2 Classifier]
     end
     
-    %% Storage
-    subgraph Storage [Storage / Disk]
-        Weights[(Model Weights .h5)]
-        Dataset[(Cattle Dataset)]
-    end
-
-    %% Flow
-    User -->|Interacts with| UI
-    UI -->|Uploads Image| ImageUpload
-    ImageUpload -->|HTTP POST Request| API
-    
+    User -->|Uploads Image| UI
+    UI -->|HTTP POST Request| API
     API -->|Validates & Forwards| ImageHandler
-    ImageHandler -->|Sends In-Memory Bytes| Preprocessor
+    ImageHandler -->|Sends In-Memory Bytes| YOLO
     
-    Weights -.->|Loads| ModelLoader
-    ModelLoader -->|Initializes| MobileNetV2
+    YOLO -->|Cropped Image| Preprocessor
+    YOLO -.->|If No Cattle| API
     
-    Preprocessor -->|Feeds Normalized Tensor| MobileNetV2
+    Preprocessor -->|Normalized Tensor| MobileNetV2
     MobileNetV2 -->|Predicts Breed & Confidence| API
     
     API -->|HTTP Response JSON| ResultsDisplay
     ResultsDisplay -->|Displays Results| User
-    
-    %% Training Flow
-    Dataset -.->|Used by| TrainingScript[Training_model.py]
-    TrainingScript -.->|Generates| Weights
 ```
 
-### 5.2 System Components
-1. **Frontend (React):** A modern, responsive web interface that allows users to upload single or multiple images. It handles HTTP requests to the backend and dynamically renders the classification results (breed name and confidence score).
-2. **Backend (FastAPI):** A high-speed, asynchronous REST API. It handles incoming image files, processing them in-memory to reduce disk I/O bottlenecks, and routes them to the ML Core for inference.
-3. **ML Core (`ml_core.py`):** A centralized Python module housing all machine learning logic. It defines the model architecture, loads the pre-trained weights, and contains the preprocessing pipeline, ensuring consistency across backend serving and local testing.
+### 6.2 Flowchart
+The following flowchart illustrates the image processing pipeline during inference:
 
-## 6. Technologies Used
-* **Deep Learning Framework:** TensorFlow / Keras (MobileNetV2)
-* **Computer Vision:** OpenCV (`cv2`), NumPy
-* **Backend Server:** FastAPI, Uvicorn, Python 3.8+
-* **Frontend Application:** React, JavaScript, Node.js 18+
-* **Data Format:** JSON (for API communication)
+```mermaid
+flowchart TD
+    A([Start: Image Uploaded]) --> B[Decode Image to Memory]
+    B --> C[YOLOv8 Detection]
+    C --> D{Cattle Detected?}
+    D -- No --> E[Return 'No Cattle Detected']
+    D -- Yes --> F[Crop Image with 10% Padding]
+    F --> G[Resize & Normalize 224x224]
+    G --> H[MobileNetV2 Prediction]
+    H --> I[Determine Highest Probability Breed]
+    I --> J[Return Breed & Confidence]
+    E --> K([End])
+    J --> K
+```
+
+### 6.3 Class Diagram
+The core machine learning logic in `ml_core.py` is structured using Object-Oriented Programming principles.
+
+```mermaid
+classDiagram
+    class CattleDetector {
+        +model: YOLO
+        +target_class: int
+        +detect_and_crop(image)
+    }
+    
+    class DataPreprocessor {
+        +target_size: tuple
+        +preprocess(image)
+    }
+    
+    class BreedClassifier {
+        +num_classes: int
+        +model: tf.keras.Model
+        -_build_model()
+        +load_model(weights_path)
+        +predict(processed_image, class_names)
+    }
+    
+    class ImageHandler {
+        +load_image(filepath)$
+    }
+    
+    CattleDetector --|> DataPreprocessor : Passes Cropped Image
+    DataPreprocessor --|> BreedClassifier : Passes Tensor
+```
 
 ## 7. Implementation Highlights
-* **Decoupled Architecture:** By separating the `ml_core.py` from `app.py` (FastAPI), the system ensures that the API logic and ML logic can be maintained and scaled independently.
-* **In-Memory Processing:** The backend utilizes FastAPI's `UploadFile` to read image streams directly into memory, converting them to NumPy arrays for immediate prediction. This avoids latency associated with writing temporary files to disk.
-* **Dynamic Breed Registration:** The system dynamically infers the target breed classes based on the folder structure in the `cattle/` directory, making the pipeline adaptable to new datasets without hardcoding class names.
+* **Two-Step Pipeline:** Combining YOLOv8 for robust cropping and MobileNetV2 for classification drastically reduces misclassifications caused by background elements.
+* **Graceful Error Handling:** Implementing the "No Cattle Detected" flow prevents the classifier from confidently guessing breeds on images of cars, people, or empty fields.
+* **In-Memory Processing:** The backend utilizes FastAPI to read image streams directly into memory, converting them to NumPy arrays. This avoids disk I/O bottlenecks.
+* **Decoupled Architecture:** Separating the `ml_core.py` from `app.py` ensures the API and ML logic can be scaled or updated independently.
 
 ## 8. Conclusion
-The Cattle Breed Classification System successfully demonstrates the application of deep learning in precision agriculture. By combining the power of MobileNetV2 for feature extraction with a modern web stack (React and FastAPI), the project delivers a fast, accurate, and user-friendly tool for livestock identification. The clean, decoupled architecture ensures that the project is highly maintainable and serves as a robust foundation for future enhancements.
+The Cattle Breed Classification System successfully demonstrates a robust application of computer vision in precision agriculture. By combining the powerful object detection capabilities of YOLOv8 with the efficient feature extraction of MobileNetV2, the system handles real-world images effectively. The modern web stack (React and FastAPI) provides a fast and accessible interface, making it a valuable tool for livestock identification and management.
 
 ## 9. Future Work
-* **Dataset Augmentation:** Incorporating more diverse images across different lighting conditions and angles to improve the model's generalization capabilities.
-* **Mobile Application:** Porting the React frontend to React Native to provide farmers with a dedicated mobile application for on-the-field identification.
-* **Deployment:** Containerizing the application using Docker and deploying it to a cloud platform (e.g., AWS, GCP) to ensure global accessibility and scalability.
-* **Continuous Integration/Continuous Deployment (CI/CD):** Implementing automated testing and deployment pipelines for streamlined updates.
+* **Dataset Augmentation:** Incorporating more diverse images across different lighting conditions and angles to further improve model robustness.
+* **Mobile Application:** Porting the React frontend to React Native to provide a dedicated mobile application for on-the-field use.
+* **Cloud Deployment:** Containerizing the application using Docker and deploying it to cloud platforms (e.g., AWS, GCP).
+
+## 10. References
+1. Redmon, J., & Farhadi, A. (2018). YOLOv3: An Incremental Improvement. *arXiv preprint arXiv:1804.02767*. (Basis for YOLO architecture, updated by Ultralytics as YOLOv8).
+2. Sandler, M., Howard, A., Zhu, M., Zhmoginov, A., & Chen, L. C. (2018). MobileNetV2: Inverted Residuals and Linear Bottlenecks. In *Proceedings of the IEEE conference on computer vision and pattern recognition* (pp. 4510-4520).
+3. Ultralytics YOLOv8 Documentation. Available: https://docs.ultralytics.com/
+4. FastAPI Documentation. Available: https://fastapi.tiangolo.com/
+5. React Documentation. Available: https://react.dev/
+6. Darpude, A. "Indian Cattle Image Dataset." Kaggle. Available: https://www.kaggle.com/datasets/atharvadarpude/indian-cattle-image-dataset

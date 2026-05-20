@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import tensorflow as tf
+from ultralytics import YOLO
 
 # Configuration constants
 DATASET_DIR = 'cattle'
@@ -15,6 +16,38 @@ def get_target_breeds(dataset_dir=DATASET_DIR):
         return sorted([d for d in os.listdir(dataset_dir) if os.path.isdir(os.path.join(dataset_dir, d))])
     return []
 
+class CattleDetector:
+    """Step 1: Detects ONLY cattle using YOLOv8 with high sensitivity."""
+    def __init__(self, model_name='yolov8s.pt'): 
+        # Using yolov8s.pt for better accuracy than the 'nano' version
+        self.model = YOLO(model_name)
+        # COCO ID 19 is strictly for 'cow'
+        self.target_class = 19 
+
+    def detect_and_crop(self, image):
+        """Returns a cropped image of the cow if found, otherwise None."""
+        # conf=0.20 makes the detector very sensitive to cows in the background
+        results = self.model(image, conf=0.20, verbose=False) 
+        
+        for result in results:
+            for box in result.boxes:
+                # Check ONLY for the cow class
+                if int(box.cls[0]) == self.target_class:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    
+                    # Add 10% padding to ensure the whole animal is visible for the classifier
+                    h, w, _ = image.shape
+                    pad_w = int((x2 - x1) * 0.1)
+                    pad_h = int((y2 - y1) * 0.1)
+                    
+                    x1_new = max(0, x1 - pad_w)
+                    y1_new = max(0, y1 - pad_h)
+                    x2_new = min(w, x2 + pad_w)
+                    y2_new = min(h, y2 + pad_h)
+                    
+                    return image[y1_new:y2_new, x1_new:x2_new]
+        return None
+
 class ImageHandler:
     """Manages I/O operations for cattle images."""
     @staticmethod
@@ -23,7 +56,7 @@ class ImageHandler:
             raise FileNotFoundError(f"Image not found at path: {filepath}")
         image = cv2.imread(filepath)
         if image is None:
-            raise ValueError(f"Failed to load image. Ensure it is a valid format: {filepath}")
+            raise ValueError(f"Failed to load image: {filepath}")
         return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 class DataPreprocessor:
@@ -37,67 +70,32 @@ class DataPreprocessor:
         return np.expand_dims(normalized_image, axis=0)
 
 class BreedClassifier:
-    """The core engine encapsulating the deep learning model."""
+    """Step 2: The engine for classifying the specific cattle breed."""
     def __init__(self, num_classes, model_weights_path=WEIGHTS_PATH):
         self.num_classes = num_classes
         self.model = self._build_model()
-        
         if model_weights_path and os.path.exists(model_weights_path):
             self.load_model(model_weights_path)
-        else:
-            print("No pre-trained weights found. The model might need to be trained.")
 
     def _build_model(self):
-        """Constructs and compiles the MobileNetV2 Transfer Learning Architecture."""
+        """Constructs and compiles the MobileNetV2 architecture."""
         base_model = tf.keras.applications.MobileNetV2(
-            weights='imagenet', 
-            include_top=False, 
-            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3)
+            weights='imagenet', include_top=False, input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3)
         )
-        base_model.trainable = False # Freeze base layers
-        
-        x = base_model.output
-        x = tf.keras.layers.GlobalAveragePooling2D()(x)
+        base_model.trainable = False
+        x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
         x = tf.keras.layers.Dense(512, activation='relu')(x)
         predictions = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)
-        
         model = tf.keras.models.Model(inputs=base_model.input, outputs=predictions)
-        
-        model.compile(optimizer='adam', 
-                      loss='sparse_categorical_crossentropy', 
-                      metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
         return model
 
-    def train_model(self, train_dataset, val_dataset, epochs=10, save_path=WEIGHTS_PATH):
-        """Trains the model on the provided datasets and saves the weights."""
-        print("\nStarting model training...")
-        
-        early_stop = tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss', 
-            patience=3, 
-            restore_best_weights=True
-        )
-        
-        history = self.model.fit(
-            train_dataset,
-            validation_data=val_dataset,
-            epochs=epochs,
-            callbacks=[early_stop]
-        )
-        
-        self.model.save_weights(save_path)
-        print(f"\nTraining complete. Weights saved to {save_path}")
-        return history
-
     def load_model(self, weights_path):
-        """Loads trained weights into the model architecture."""
-        print(f"Loading weights from {weights_path}...")
         self.model.load_weights(weights_path)
-        print("Weights loaded successfully.")
 
     def predict(self, processed_image, class_names):
-        """Performs the forward pass to determine breed category."""
+        """Performs breed classification on the cropped image."""
         predictions = self.model.predict(processed_image, verbose=0)
-        predicted_class_index = np.argmax(predictions[0])
-        confidence = np.max(predictions[0])
-        return class_names[predicted_class_index], round(float(confidence) * 100, 2)
+        idx = np.argmax(predictions[0])
+        conf = np.max(predictions[0])
+        return class_names[idx], round(float(conf) * 100, 2)
